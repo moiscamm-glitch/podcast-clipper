@@ -1,0 +1,65 @@
+name: Podcast Clipper Pipeline
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system tools (ffmpeg, yt-dlp)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install yt-dlp openai-whisper --break-system-packages
+
+      - name: Install Node dependencies
+        run: |
+          npm install playwright
+          npx playwright install --with-deps chromium
+
+      - name: Restore sessions from secrets
+        run: |
+          echo "${{ secrets.TIKTOK_SESSION_B64 }}" | base64 -d > tiktok-session.json
+          echo "${{ secrets.INSTAGRAM_SESSION_B64 }}" | base64 -d > instagram-session.json
+          echo "${{ secrets.YOUTUBE_SESSION_B64 }}" | base64 -d > youtube-session.json
+
+      - name: Check for new episode link
+        run: node check-for-link.js
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALLOWED_CHAT_ID: ${{ secrets.TELEGRAM_ALLOWED_CHAT_ID }}
+
+      - name: Process next pending episode
+        run: node process-episode.js
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots
+          path: |
+            *-failure.png
+          if-no-files-found: ignore
+
+      - name: Commit progress
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add episodes.json telegram-link-state.json
+          git commit -m "Update pipeline progress" || echo "No changes to commit"
+          git push

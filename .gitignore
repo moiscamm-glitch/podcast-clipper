@@ -1,0 +1,7 @@
+node_modules/
+*.session.json
+tiktok-session.json
+instagram-session.json
+youtube-session.json
+cookies.json
+*.png
