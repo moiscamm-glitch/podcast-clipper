@@ -26,6 +26,11 @@ jobs:
           sudo apt-get install -y ffmpeg
           pip install yt-dlp openai-whisper --break-system-packages
 
+      - name: Install Deno (JS runtime yt-dlp needs for YouTube extraction)
+        run: |
+          curl -fsSL https://deno.land/install.sh | sh
+          echo "$HOME/.deno/bin" >> $GITHUB_PATH
+
       - name: Install Node dependencies
         run: |
           npm install playwright
