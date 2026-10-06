@@ -1,4 +1,6 @@
 // check-for-link.js
+// Checks the Telegram bot for a new Google Drive share link (not a YouTube
+// link anymore — see download-drive.js for why).
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -6,7 +8,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_ALLOWED_CHAT_ID;
 const STATE_FILE = path.join(__dirname, 'telegram-link-state.json');
 const EPISODES_FILE = path.join(__dirname, 'episodes.json');
-const YOUTUBE_URL_REGEX = /(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/i;
+const DRIVE_URL_REGEX = /https?:\/\/drive\.google\.com\/\S+/i;
 
 if (!BOT_TOKEN || !ALLOWED_CHAT_ID) { console.error('Missing Telegram env vars. Skipping.'); process.exit(0); }
 
@@ -24,7 +26,7 @@ function apiPost(method, body) {
   const payload = JSON.stringify(body);
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
   return new Promise((resolve, reject) => {
-    const req = require('https').request(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } }, (res) => {
+    const req = https.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } }, (res) => {
       let data = ''; res.on('data', (c) => (data += c)); res.on('end', () => resolve(data));
     });
     req.on('error', reject); req.write(payload); req.end();
@@ -48,7 +50,7 @@ async function main() {
     const message = update.message;
     if (!message || !message.text) continue;
     if (String(message.chat.id) !== String(ALLOWED_CHAT_ID)) continue;
-    const match = message.text.match(YOUTUBE_URL_REGEX);
+    const match = message.text.match(DRIVE_URL_REGEX);
     if (match) {
       episodes.queue.push({ url: match[0], status: 'pending', addedAt: new Date().toISOString() });
       found += 1;

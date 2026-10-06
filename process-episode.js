@@ -1,14 +1,7 @@
 // process-episode.js
 // THE ORCHESTRATOR. Picks the next pending episode and runs the ENTIRE
-// pipeline for it in one go, in one workflow run: download -> transcribe ->
-// pick highlights -> cut/reframe/caption/post all 5 clips.
-//
-// Why "all in one run" instead of spreading across multiple 2-hour runs:
-// the downloaded video and transcript only exist on this run's temporary
-// disk — they are NOT saved back to GitHub between runs (videos are too
-// big/slow to commit to git every cycle). So one episode must finish
-// start-to-finish in a single run, or it has to start over from scratch.
-// GitHub gives each run up to 6 hours, which is enough for one episode.
+// pipeline for it: download (from Google Drive) -> transcribe -> pick
+// highlights -> cut/reframe/caption/post all 5 clips.
 
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -56,8 +49,8 @@ async function main() {
 
   console.log(`Processing episode: ${episode.url}`);
 
-  console.log('\n=== Stage 1: Download ===');
-  run(`node download.js "${episode.url}" "${sourcePath}"`);
+  console.log('\n=== Stage 1: Download from Google Drive ===');
+  run(`node download-drive.js "${episode.url}" "${sourcePath}"`);
 
   console.log('\n=== Stage 2: Transcribe ===');
   run(`python3 transcribe.py "${sourcePath}" "${transcriptPath}"`);
@@ -90,7 +83,6 @@ async function main() {
   episode.clipResults = clipResults;
   saveJson(EPISODES_FILE, episodes);
 
-  // Clean up — the actual video files never need to leave this run's disk.
   fs.rmSync(WORK_DIR, { recursive: true, force: true });
 
   console.log('\nEpisode fully processed.');
